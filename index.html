@@ -19,6 +19,7 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
   const params = new URLSearchParams(window.location.search);
   const app = document.getElementById('app');
 
+  // COS存储桶地址（用于加载活码配置）
   const COS_BASE = 'https://qr-audio-1482662045.cos.ap-guangzhou.myqcloud.com';
 
   function render(mediaUrl, type) {
@@ -44,15 +45,24 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
     } else if (mediaType === 'pdf') {
       html = '<iframe src="' + mediaUrl + '" style="width:100%;height:100vh;border:none;position:fixed;top:0;left:0"></iframe>';
     } else if (mediaType === 'html') {
-      window.location.href = mediaUrl;
+      // 用fetch拉HTML内容直接渲染，避免跳转导致微信触发下载
+      fetch(mediaUrl).then(function(r){return r.text()}).then(function(htmlContent){
+        document.open();
+        document.write(htmlContent);
+        document.close();
+      }).catch(function(){
+        app.className = 'error';
+        app.innerHTML = '<p>加载失败</p>';
+      });
       return;
     } else {
-      html = '<div style="padding:20px;text-align:center;background:#f5f7fa;min-height:100vh"><div style="background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,.08);max-width:400px;margin:40px auto"><div style="font-size:48px;margin-bottom:16px"></div><div style="font-size:16px;color:#333;margin-bottom:8px;word-break:break-all">' + fileName + '</div><a href="' + mediaUrl + '" style="display:inline-block;padding:12px 32px;background:#667eea;color:#fff;text-decoration:none;border-radius:8px;font-size:14px" target="_blank">打开文件</a></div></div>';
+      html = '<div style="padding:20px;text-align:center;background:#f5f7fa;min-height:100vh"><div style="background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,.08);max-width:400px;margin:40px auto"><div style="font-size:48px;margin-bottom:16px">📄</div><div style="font-size:16px;color:#333;margin-bottom:8px;word-break:break-all">' + fileName + '</div><a href="' + mediaUrl + '" style="display:inline-block;padding:12px 32px;background:#667eea;color:#fff;text-decoration:none;border-radius:8px;font-size:14px" target="_blank">打开文件</a></div></div>';
     }
     app.innerHTML = html;
     app.className = '';
   }
 
+  // 活码模式：从COS加载配置，查找ID对应的URL
   const liveId = params.get('live');
   if (liveId) {
     const script = document.createElement('script');
@@ -73,6 +83,7 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
     return;
   }
 
+  // 普通模式：直接显示URL参数
   const mediaUrl = params.get('url');
   if (!mediaUrl) {
     app.className = 'error';
