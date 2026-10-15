@@ -1461,12 +1461,25 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
         return;
       }
       var config = LIVE_CONFIG[liveId];
-      // 活码支持3种模式：
-      // 1. manifest URL → fetch manifest → render
-      // 2. 多URL（urls字段）→ renderMultiUrls
-      // 3. 单URL（url字段）→ renderSingle（向后兼容）
-      if (config.manifest) {
-        // 活码指向manifest
+      // 活码支持以下模式（优先级从高到低）：
+      // 1. items字段 → 直接渲染组合/多媒体内容（无需fetch，微信兼容）
+      // 2. url字段 → 单文件渲染（img/video/audio标签，不走CORS）
+      // 3. manifest字段 → 旧版兼容（需fetch，可能微信不兼容）
+      // 4. urls字段 → 旧版多URL
+      if (config.items && config.items.length > 0) {
+        // 新格式：items直接存在config里，无需fetch（微信兼容）
+        renderManifest({
+          title: config.title || '',
+          items: config.items,
+          galleryCols: config.galleryCols,
+          bg: config.bg || '#f5f7fa',
+          titleStyle: config.titleStyle
+        });
+      } else if (config.url) {
+        // 单文件：COS直链，用img/video/audio标签渲染（不走CORS）
+        renderSingle(config.url, config.type || params.get('type'));
+      } else if (config.manifest) {
+        // 旧版兼容：manifest URL需要fetch（微信可能拦截）
         fetch(config.manifest).then(function(r) {
           if (!r.ok) throw new Error('HTTP ' + r.status);
           return r.json();
@@ -1477,13 +1490,10 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
           app.innerHTML = '<p>加载失败</p><button class="retry" onclick="location.reload()">重试</button>';
         });
       } else if (config.urls) {
-        // 活码指向多URL
+        // 旧版多URL
         var type = config.type || 'auto';
         if (type === 'auto' && config.urls.length > 0) type = detectType(config.urls[0]);
         renderMultiUrls(config.urls, type, config.title || '');
-      } else if (config.url) {
-        // 活码指向单URL（向后兼容）
-        renderSingle(config.url, config.type || params.get('type'));
       } else {
         app.className = 'error';
         app.innerHTML = '<p>活码配置无效</p>';
