@@ -3551,7 +3551,7 @@ const PDFViewerApplication = {
   web_print_service__WEBPACK_IMPORTED_MODULE_19__.PDFPrintServiceFactory.initGlobals(PDFViewerApplication);
 }
 {
-  const HOSTED_VIEWER_ORIGINS = ["null", "http://mozilla.github.io", "https://mozilla.github.io", "https://2014715434-sketch.github.io", "http://localhost:18900", "http://127.0.0.1:18900", "http://localhost:18901", "http://127.0.0.1:18901"];
+  const HOSTED_VIEWER_ORIGINS = ["null", "http://mozilla.github.io", "https://mozilla.github.io", "https://2014715434-sketch.github.io", "https://a895982623-droid.github.io", "https://a15088226245-crypto.github.io", "http://localhost:18900", "http://127.0.0.1:18900", "http://localhost:18901", "http://127.0.0.1:18901"];
   var validateFileURL = function (file) {
     if (!file) {
       return;
