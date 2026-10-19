@@ -1783,6 +1783,46 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
     flattenPdfFrames();
   }
 
+  // ============ 流量闸门：制作者流量用完则暂停展示（无 traffic 档案 = 老客户/定制版 = 不限） ============
+  function extractCid(u) {
+    var m = /myqcloud\.com\/c\/([0-9a-zA-Z]+)\//.exec(u || '');
+    return m ? m[1] : null;
+  }
+  function collectItemUrls(items) {
+    var out = [];
+    (items || []).forEach(function(it) {
+      if (!it) return;
+      if (it.url) out.push(it.url);
+      if (it.urls) out.push.apply(out, it.urls);
+    });
+    return out;
+  }
+  function showTrafficGate() {
+    app.className = 'error';
+    try { document.title = '内容暂时无法查看'; } catch (e) {}
+    app.innerHTML = '<div style="padding:70px 24px;text-align:center">' +
+      '<p style="font-size:17px;color:#333;font-weight:600;margin-bottom:10px">内容暂时无法查看</p>' +
+      '<p style="font-size:13px;color:#999;line-height:1.8">制作者正在维护中，请稍后再试<br>或联系分享这个二维码给你的人</p></div>';
+  }
+  // 任一 URL 属于某客户即检查该客户流量；脚本超时/404/跨域失败一律放行（不误伤）
+  function trafficGate(urls, proceed) {
+    var cid = null;
+    for (var i = 0; i < urls.length && !cid; i++) cid = extractCid(urls[i]);
+    if (!cid) { proceed(); return; }
+    var done = false;
+    var finish = function(blocked) { if (done) return; done = true; if (blocked) showTrafficGate(); else proceed(); };
+    var timer = setTimeout(function() { finish(false); }, 4000);
+    var s = document.createElement('script');
+    s.src = COS_BASE + '/traffic/' + encodeURIComponent(cid) + '.js?t=' + Date.now();
+    s.onload = function() {
+      clearTimeout(timer);
+      var t = window.QRM_TRAFFIC;
+      finish(!!(t && t.cid === cid && (+(t.balance) - +(t.used)) <= 0));
+    };
+    s.onerror = function() { clearTimeout(timer); finish(false); };
+    document.head.appendChild(s);
+  }
+
   // ============ 活码模式 ============
   var liveId = params.get('live');
   if (liveId) {
@@ -1815,6 +1855,7 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
       // 2. url字段 → 单文件渲染（img/video/audio标签，不走CORS）
       // 3. manifest字段 → 旧版兼容（需fetch，可能微信不兼容）
       // 4. urls字段 → 旧版多URL
+      var _dispatchLive = function() {
       if (config.items && config.items.length > 0) {
         // 新格式：items直接存在config里，无需fetch（微信兼容）
         renderManifest({
@@ -1852,6 +1893,8 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
         app.className = 'error';
         app.innerHTML = '<p>活码配置无效</p>';
       }
+      };
+      trafficGate(config.items ? collectItemUrls(config.items) : (config.url ? [config.url] : (config.urls || (config.manifest ? [config.manifest] : []))), _dispatchLive);
     };
     // 优先按ID加载拆分的小配置文件（几KB，秒开）；不存在再回退全局大配置（兼容老码）
     // 10秒无响应给重试入口（COS挂起时onerror不一定触发）
@@ -1881,6 +1924,7 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
   // ============ Manifest 模式 ============
   var manifestUrl = params.get('manifest');
   if (manifestUrl) {
+    trafficGate([manifestUrl], function() {
     fetch(manifestUrl).then(function(r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
@@ -1889,6 +1933,7 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
     }).catch(function(err) {
       app.className = 'error';
       app.innerHTML = '<p>加载失败</p><p style="font-size:12px;color:#bbb">' + err.message + '</p><button class="retry" onclick="location.reload()">重试</button>';
+    });
     });
     return;
   }
@@ -1905,14 +1950,14 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
     if (type === 'auto' && urls.length > 0) {
       type = detectType(urls[0]); // 用第一个URL推断类型
     }
-    renderMultiUrls(urls, type, title, colorsParam);
+    trafficGate(urls, function() { renderMultiUrls(urls, type, title, colorsParam); });
     return;
   }
 
   // ============ 单URL模式（向后兼容） ============
   var mediaUrl = params.get('url');
   if (mediaUrl) {
-    renderSingle(mediaUrl, params.get('type'));
+    trafficGate([mediaUrl], function() { renderSingle(mediaUrl, params.get('type')); });
     return;
   }
 
