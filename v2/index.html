@@ -555,10 +555,8 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
   var Renderer = {
     // 单图片
     singleImage: function(url, title, bg) {
-      var h = '';
-      if (title) h += '<div class="page-title">' + escapeHtml(title) + '</div>';
-      h += '<div class="single-image"' + (bg ? ' style="background:' + colorCss(bg) + '"' : '') + '><img src="' + url + '" onclick="openFullscreen(this)" alt=""></div>';
-      return h;
+      // 标题只进微信顶栏(document.title)，不压在图片上
+      return '<div class="single-image"' + (bg ? ' style="background:' + colorCss(bg) + '"' : '') + '><img src="' + url + '" onclick="openFullscreen(this)" alt=""></div>';
     },
 
     // 单视频
@@ -593,10 +591,9 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
       return h;
     },
 
-    // 多图画廊
+    // 多图画廊（标题只进微信顶栏）
     multiImage: function(items, title) {
       var h = '';
-      if (title) h += '<div class="page-title">' + escapeHtml(title) + '</div>';
       var n = items.length;
       var gc = n === 1 ? 'g-1' : n === 2 ? 'g-2' : n === 3 ? 'g-3' : n === 4 ? 'g-4' : 'g-many';
       h += '<div class="gallery ' + gc + '">';
@@ -615,10 +612,9 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
       return h;
     },
 
-    // 多视频
+    // 多视频（标题只进微信顶栏）
     multiVideo: function(items, title) {
       var h = '';
-      if (title) h += '<div class="page-title">' + escapeHtml(title) + '</div>';
       h += '<div class="video-list">';
       for (var i = 0; i < items.length; i++) {
         h += '<div class="video-item">';
@@ -630,10 +626,9 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
       return h;
     },
 
-    // 多音频
+    // 多音频（标题只进微信顶栏）
     multiAudio: function(items, title) {
       var h = '';
-      if (title) h += '<div class="page-title">' + escapeHtml(title) + '</div>';
       h += '<div class="audio-list">';
       for (var i = 0; i < items.length; i++) {
         h += '<div class="audio-item">';
@@ -886,9 +881,9 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
     pageBg = bg;
 
     // 标题渲染（支持样式）
-    // 纯文档内容（全是PDF/Office）不在页面上压标题——标题已在微信顶栏
+    // 纯媒体/文档内容（全是图片/视频/音频/PDF/Office）不在页面上压标题——标题已在微信顶栏
     var allDocs = data.items && data.items.length > 0 && data.items.every(function(it) {
-      return it.type === 'pdf' || it.type === 'office';
+      return it.type === 'pdf' || it.type === 'office' || it.type === 'image' || it.type === 'video' || it.type === 'audio';
     });
     if (title && !allDocs) {
       var ts = 'text-align:' + (titleStyle.textAlign || 'center') + ';padding:20px 16px 8px;word-break:break-word;';
@@ -1767,9 +1762,8 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
     } else if (type === 'audio') {
       h = Renderer.multiAudio(items, title);
     } else {
-      // 混合类型 → 逐个渲染
+      // 混合类型 → 逐个渲染（标题只进微信顶栏）
       h = '';
-      if (title) h += '<div class="page-title">' + escapeHtml(title) + '</div>';
       for (var i = 0; i < urls.length; i++) {
         var t = detectType(urls[i]);
         if (t === 'image') {
