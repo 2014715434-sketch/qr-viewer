@@ -565,7 +565,7 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
     singleVideo: function(url, title) {
       var h = '';
       h += '<div class="single-video">';
-      h += '<video src="' + url + '" controls autoplay playsinline webkit-playsinline preload="metadata"></video>';
+      h += '<video src="' + url + '" controls playsinline webkit-playsinline preload="metadata"></video>';
       h += '</div>';
       return h;
     },
@@ -734,10 +734,10 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
       }
     });
     if (!ok) { alert('请填写所有必填项'); return; }
-    // 禁用表单
+    // 禁用表单（多步骤表单没有 .form-submit 按钮，用"提交"步进按钮兜底）
     inputs.forEach(function(inp) { inp.disabled = true; });
-    document.querySelector('.form-submit').disabled = true;
-    document.querySelector('.form-submit').textContent = '提交中...';
+    var submitBtn = document.querySelector('.form-submit') || document.getElementById('stepNext');
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '提交中...'; }
     // 如果有html2canvas则截图提交
     if (typeof html2canvas !== 'undefined') {
       var card = document.querySelector('.form-card');
@@ -745,21 +745,30 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
         canvas.toBlob(function(blob) {
           // 上传截图到COS（如果有配置）
           document.getElementById('formSuccess').style.display = '';
-          document.querySelector('.form-submit').textContent = '已提交';
+          if (submitBtn) submitBtn.textContent = '已提交';
         }, 'image/png');
       }).catch(function() {
         document.getElementById('formSuccess').style.display = '';
-        document.querySelector('.form-submit').textContent = '已提交';
+        if (submitBtn) submitBtn.textContent = '已提交';
       });
     } else {
       document.getElementById('formSuccess').style.display = '';
-      document.querySelector('.form-submit').textContent = '已提交';
+      if (submitBtn) submitBtn.textContent = '已提交';
     }
   };
 
-  // ============ 多步骤表单导航 ============
+  // ============ 多步骤表单导航（状态从DOM推导，不依赖注入的script——innerHTML里的script不执行） ============
+  function _formStepState() {
+    var contents = document.querySelectorAll('.step-content');
+    var cur = 0;
+    for (var i = 0; i < contents.length; i++) { if (contents[i].classList.contains('active')) { cur = i; break; } }
+    return { cur: cur, total: contents.length };
+  };
+
   window.formStepNext = function() {
-    if (typeof currentStep === 'undefined') return;
+    var st = _formStepState();
+    if (!st.total) return;
+    var currentStep = st.cur, totalSteps = st.total;
     // 验证当前步骤的必填字段
     var currentContent = document.getElementById('stepContent' + currentStep);
     var requiredInputs = currentContent.querySelectorAll('[required]');
@@ -771,13 +780,13 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
         return;
       }
     }
+    // 最后一步 = 提交
+    if (currentStep === totalSteps - 1) { submitQRForm(); return; }
     // 隐藏当前步骤
     document.getElementById('stepContent' + currentStep).classList.remove('active');
     document.getElementById('stepDot' + currentStep).classList.remove('active');
     document.getElementById('stepDot' + currentStep).classList.add('done');
-    if (currentStep < totalSteps - 1) {
-      document.getElementById('stepLine' + (currentStep + 1)).classList.add('done');
-    }
+    document.getElementById('stepLine' + (currentStep + 1)).classList.add('done');
     currentStep++;
     // 显示下一步骤
     document.getElementById('stepContent' + currentStep).classList.add('active');
@@ -792,7 +801,10 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
   };
 
   window.formStepPrev = function() {
-    if (typeof currentStep === 'undefined' || currentStep === 0) return;
+    var st = _formStepState();
+    if (!st.total) return;
+    var currentStep = st.cur, totalSteps = st.total;
+    if (currentStep === 0) return;
     document.getElementById('stepContent' + currentStep).classList.remove('active');
     document.getElementById('stepDot' + currentStep).classList.remove('active');
     currentStep--;
@@ -1142,7 +1154,6 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
       h += '<button class="step-next" id="stepNext" onclick="formStepNext()">下一步</button>';
       h += '</div>';
       h += '<div class="form-success" id="formSuccess" style="display:none">提交成功!</div>';
-      h += '<script>var currentStep=0;var totalSteps=' + steps.length + ';<\/script>';
     } else {
       // 普通单步表单
       h += '<form id="qrForm" onsubmit="return false">';
@@ -1577,8 +1588,8 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
     h += '</div>';
     if (buyUrl || contactUrl) {
       h += '<div class="product-actions">';
-      if (contactUrl) h += '<button class="contact-btn" onclick="window.location.href=\'' + contactUrl + '\'">联系客服</button>';
-      if (buyUrl) h += '<button class="buy-btn" onclick="window.location.href=\'' + buyUrl + '\'">立即购买</button>';
+      if (contactUrl) h += '<button class="contact-btn" data-goto="' + escapeHtml(contactUrl) + '" onclick="window.location.href=this.getAttribute(\'data-goto\')">联系客服</button>';
+      if (buyUrl) h += '<button class="buy-btn" data-goto="' + escapeHtml(buyUrl) + '" onclick="window.location.href=this.getAttribute(\'data-goto\')">立即购买</button>';
       h += '</div>';
     }
     h += '</div>';
@@ -1606,10 +1617,12 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
     h += '</div>';
     if (desc) h += '<div class="event-desc">' + escapeHtml(desc).replace(/\n/g, '<br>') + '</div>';
 
-    // 倒计时（如果有日期）
+    // 倒计时（如果有日期；日期格式非法时跳过倒计时，不能让它炸掉整个渲染）
     if (date) {
-      var targetDate = new Date(date).toISOString();
-      h += renderCountdown({target: targetDate, title: '距离活动开始'});
+      var _d = new Date(date);
+      if (!isNaN(_d.getTime())) {
+        h += renderCountdown({target: _d.toISOString(), title: '距离活动开始'});
+      }
     }
 
     // 地图
@@ -1771,12 +1784,18 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
   // ============ 活码模式 ============
   var liveId = params.get('live');
   if (liveId) {
+    var triedGlobal = false;
+    var liveLoadTimer = null;
     var renderLiveConfig = function() {
       if (typeof LIVE_CONFIG === 'undefined' || !LIVE_CONFIG[liveId]) {
+        // 拆分小文件里没有该id时，回退全局大配置再找一次（拆分上传失败/延迟的兜底）
+        if (!triedGlobal) { triedGlobal = true; loadGlobalConfig(); return; }
+        clearTimeout(liveLoadTimer);
         app.className = 'error';
         app.innerHTML = '<p>活码不存在或已被删除</p>';
         return;
       }
+      clearTimeout(liveLoadTimer);
       var config = LIVE_CONFIG[liveId];
       // 试用码过期检查（试用版生成的码到期失效）
       if (config.expire && Date.now() / 1000 > config.expire) {
@@ -1831,11 +1850,17 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
       }
     };
     // 优先按ID加载拆分的小配置文件（几KB，秒开）；不存在再回退全局大配置（兼容老码）
+    // 10秒无响应给重试入口（COS挂起时onerror不一定触发）
+    liveLoadTimer = setTimeout(function() {
+      app.className = 'error';
+      app.innerHTML = '<p>加载超时，请检查网络</p><button class="retry" onclick="location.reload()">重试</button>';
+    }, 10000);
     var loadGlobalConfig = function() {
       var s2 = document.createElement('script');
       s2.src = COS_BASE + '/_live_config.js?t=' + Date.now();
       s2.onload = renderLiveConfig;
       s2.onerror = function() {
+        clearTimeout(liveLoadTimer);
         app.className = 'error';
         app.innerHTML = '<p>加载失败，请检查网络</p><button class="retry" onclick="location.reload()">重试</button>';
       };
