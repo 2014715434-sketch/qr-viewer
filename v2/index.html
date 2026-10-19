@@ -584,8 +584,8 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
     // 单PDF
     singlePdf: function(url, title, allowDl) {
       // pdf.js 内嵌查看器：扫码直接看，不用下载
+      // 标题放微信顶栏(document.title)，不在PDF上方压一行大字
       var h = '<div style="position:fixed;inset:0;display:flex;flex-direction:column;background:#fff">';
-      if (title) h += '<div style="flex:none;padding:10px 16px;font-size:16px;font-weight:600;color:#222;text-align:center;border-bottom:1px solid #eee">' + escapeHtml(title) + '</div>';
       h += '<iframe src="' + pdfViewerUrl(url) + '" data-autoh="1" style="flex:1;width:100%;border:0"></iframe>';
       // 下载按钮：客户可在生成时关闭（dl=0 则不显示）
       if (allowDl !== false) h += '<div style="flex:none;text-align:center;padding:6px;font-size:12px;border-top:1px solid #eee"><a href="' + url + '" target="_blank" style="color:#667eea;text-decoration:none">下载 PDF 到本地</a></div>';
@@ -649,8 +649,9 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
 
     // 文档列表
     docList: function(items, title) {
+      // 标题放微信顶栏(document.title)，不压在文档上
+      if (title) { try { document.title = title; } catch(e) {} }
       var h = '';
-      if (title) h += '<div class="page-title">' + escapeHtml(title) + '</div>';
       h += '<div class="doc-list">';
       for (var i = 0; i < items.length; i++) {
         var item = items[i];
@@ -877,6 +878,8 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
   function renderManifest(data) {
     var h = '';
     var title = data.title || '';
+    // 微信顶栏同步显示标题
+    if (title) { try { document.title = title; } catch(e) {} }
     var titleStyle = data.titleStyle || {};
     var bg = data.bg || data.backgroundColor || '#f5f7fa';
     document.body.style.background = colorCss(bg) || bg;
@@ -1688,6 +1691,8 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
   function renderSingle(mediaUrl, forceType) {
     var type = forceType || detectType(mediaUrl);
     var title = params.get('title') || '';
+    // 有标题就放到微信顶栏显示（原本固定显示 QR Master）
+    if (title) { try { document.title = title; } catch(e) {} }
     var bg = params.get('bg') || '';
     if (bg) { pageBg = bg; document.body.style.background = colorCss(bg); }
     var h = '';
@@ -1701,10 +1706,9 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
     } else if (type === 'pdf') {
       h = Renderer.singlePdf(mediaUrl, title, params.get('dl') !== '0');
     } else if (type === 'office') {
-      // Office文件 → Microsoft Online Viewer
+      // Office文件 → Microsoft Online Viewer（标题已在顶栏，不再压一行大字）
       var officeLink = 'https://view.officeapps.live.com/op/view.aspx?src=' + encodeURIComponent(mediaUrl);
       h = '<div class="doc-list" style="padding-top:40px">';
-      if (title) h += '<div class="page-title">' + escapeHtml(title) + '</div>';
       h += '<a class="doc-item" href="' + officeLink + '" target="_blank">';
       h += '<div class="doc-icon doc">&#x1F4C3;</div>';
       h += '<div class="doc-name">' + escapeHtml(getFileName(mediaUrl)) + '</div>';
@@ -1797,6 +1801,8 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
       }
       clearTimeout(liveLoadTimer);
       var config = LIVE_CONFIG[liveId];
+      // 活码标题放微信顶栏
+      if (config.title) { try { document.title = config.title; } catch(e) {} }
       // 试用码过期检查（试用版生成的码到期失效）
       if (config.expire && Date.now() / 1000 > config.expire) {
         app.className = 'error';
