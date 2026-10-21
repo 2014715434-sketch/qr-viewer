@@ -716,41 +716,9 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
     }
   };
 
-  // 表单提交（截图上传方式，和现有逻辑一致）
+  // 表单收集已下架（制作端不再提供表单模块），存量码如实提示，不做假成功
   window.submitQRForm = function() {
-    var form = document.getElementById('qrForm');
-    var inputs = form.querySelectorAll('input,textarea,select');
-    var ok = true;
-    inputs.forEach(function(inp) {
-      if (inp.hasAttribute('required') && !inp.value.trim()) {
-        inp.style.borderColor = '#ff4444';
-        ok = false;
-      } else {
-        inp.style.borderColor = '#ddd';
-      }
-    });
-    if (!ok) { alert('请填写所有必填项'); return; }
-    // 禁用表单（多步骤表单没有 .form-submit 按钮，用"提交"步进按钮兜底）
-    inputs.forEach(function(inp) { inp.disabled = true; });
-    var submitBtn = document.querySelector('.form-submit') || document.getElementById('stepNext');
-    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '提交中...'; }
-    // 如果有html2canvas则截图提交
-    if (typeof html2canvas !== 'undefined') {
-      var card = document.querySelector('.form-card');
-      html2canvas(card, {backgroundColor:'#fff', scale:2, useCORS:true}).then(function(canvas) {
-        canvas.toBlob(function(blob) {
-          // 上传截图到COS（如果有配置）
-          document.getElementById('formSuccess').style.display = '';
-          if (submitBtn) submitBtn.textContent = '已提交';
-        }, 'image/png');
-      }).catch(function() {
-        document.getElementById('formSuccess').style.display = '';
-        if (submitBtn) submitBtn.textContent = '已提交';
-      });
-    } else {
-      document.getElementById('formSuccess').style.display = '';
-      if (submitBtn) submitBtn.textContent = '已提交';
-    }
+    alert('该表单的收集功能已暂停，填写内容不会被保存，请直接联系发布者');
   };
 
   // ============ 多步骤表单导航（状态从DOM推导，不依赖注入的script——innerHTML里的script不执行） ============
@@ -1804,6 +1772,17 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
       '<p style="font-size:17px;color:#333;font-weight:600;margin-bottom:10px">内容暂时无法查看</p>' +
       '<p style="font-size:13px;color:#999;line-height:1.8">制作者正在维护中，请稍后再试<br>或联系分享这个二维码给你的人</p></div>';
   }
+  function showExpired() {
+    app.className = 'error';
+    try { document.title = '二维码已过有效期'; } catch (e) {}
+    app.innerHTML = '<div style="padding:40px 20px;text-align:center">' +
+      '<div style="font-size:48px;margin-bottom:16px">&#x23F0;</div>' +
+      '<p style="font-size:16px;color:#333;margin-bottom:8px">该二维码已过有效期</p>' +
+      '<p style="font-size:13px;color:#999">请联系内容提供方更新</p></div>';
+  }
+  // 统一有效期检查：任何模式（manifest/多URL/单URL/活码）带 exp 参数且已过期 → 失效页
+  var _expTs = +(params.get('exp') || 0);
+  if (_expTs && Date.now() / 1000 > _expTs) { showExpired(); return; }
   // 任一 URL 属于某客户即检查该客户流量；脚本超时/404/跨域失败一律放行（不误伤）
   function trafficGate(urls, proceed) {
     var cid = null;
@@ -1843,11 +1822,7 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
       if (config.title) { try { document.title = config.title; } catch(e) {} }
       // 试用码过期检查（试用版生成的码到期失效）
       if (config.expire && Date.now() / 1000 > config.expire) {
-        app.className = 'error';
-        app.innerHTML = '<div style="padding:40px 20px;text-align:center">' +
-          '<div style="font-size:48px;margin-bottom:16px">&#x23F0;</div>' +
-          '<p style="font-size:16px;color:#333;margin-bottom:8px">该二维码已过有效期</p>' +
-          '<p style="font-size:13px;color:#999">请联系内容提供方更新</p></div>';
+        showExpired();
         return;
       }
       // 活码支持以下模式（优先级从高到低）：
@@ -1929,6 +1904,8 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
     }).then(function(data) {
+      // manifest 自带 expire 字段（试用静态清单）→ 失效页
+      if (data && data.expire && Date.now() / 1000 > data.expire) { showExpired(); return; }
       renderManifest(data);
     }).catch(function(err) {
       app.className = 'error';
