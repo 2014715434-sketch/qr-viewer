@@ -1753,7 +1753,8 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
 
   // ============ 流量闸门：制作者流量用完则暂停展示（无 traffic 档案 = 老客户/定制版 = 不限） ============
   function extractCid(u) {
-    var m = /myqcloud\.com\/c\/([0-9a-zA-Z]+)\//.exec(u || '');
+    // 不写死域名：按路径 /c/{cid}/ 提取，兼容COS源站、CDN自有域名及未来定制客户域名
+    var m = /\/c\/([0-9a-zA-Z]+)\//.exec(u || '');
     return m ? m[1] : null;
   }
   function collectItemUrls(items) {
