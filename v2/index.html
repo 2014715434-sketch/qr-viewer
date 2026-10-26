@@ -247,6 +247,9 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
     return 'other';
   }
 
+  // viewer 支持的条目类型白名单（用于兼容制作端写入的未知类型，如 'file'）
+  var KNOWN_ITEM_TYPES = {image:1,video:1,audio:1,pdf:1,office:1,text:1,kv:1,form:1,divider:1,spacer:1,countdown:1,viewCount:1,vcard:1,map:1,product:1,event:1,bizcard:1};
+
   function getFileName(url) {
     try {
       return decodeURIComponent(url.split('/').pop().split('?')[0].split('#')[0]);
@@ -876,6 +879,17 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
   function renderManifest(data) {
     data = deepCdnify(deepSign(data, _SIGN_MAP));
     var h = '';
+    // 兼容：制作端可能写入 viewer 不识别的条目类型（如 'file'），按 URL 后缀统一纠正，
+    // 否则该条目会无分支命中而被静默丢弃，导致页面只剩标题、主体空白。
+    if (data.items) {
+      for (var _ni = 0; _ni < data.items.length; _ni++) {
+        var _it = data.items[_ni];
+        if (_it && _it.url && _it.type && !KNOWN_ITEM_TYPES[_it.type]) {
+          var _dt = detectType(_it.url);
+          if (_dt && _dt !== 'other') _it.type = _dt;
+        }
+      }
+    }
     var title = data.title || '';
     // 微信顶栏同步显示标题
     if (title) { try { document.title = title; } catch(e) {} }
