@@ -8,7 +8,11 @@
 <script>
 (function () {
   var TARGET = "https://qr.sznscc.cn/qr-viewer/v2/index.html";
-  var url = TARGET + (location.search || "") + (location.hash || "");
+  // 老码用的是 ?live=xxx；但 qr.sznscc.cn 的 CDN 对 live 参数名返回 405，
+  // 新 viewer 认 code || live，所以这里把 live 改写成 code 再跳。
+  var qs = location.search || "";
+  qs = qs.replace(/([?&])live(?==|&|$)/g, "$1code");
+  var url = TARGET + qs + (location.hash || "");
   try { location.replace(url); } catch (e) { location.href = url; }
 })();
 </script>
@@ -31,8 +35,11 @@
     <div class="s"><a id="manual" href="https://qr.sznscc.cn/qr-viewer/v2/index.html">如果没有自动跳转，点这里</a></div>
   </div>
   <script>
-    document.getElementById("manual").href =
-      "https://qr.sznscc.cn/qr-viewer/v2/index.html" + (location.search || "") + (location.hash || "");
+    (function () {
+      var qs = (location.search || "").replace(/([?&])live(?==|&|$)/g, "$1code");
+      document.getElementById("manual").href =
+        "https://qr.sznscc.cn/qr-viewer/v2/index.html" + qs + (location.hash || "");
+    })();
   </script>
 </body>
 </html>
